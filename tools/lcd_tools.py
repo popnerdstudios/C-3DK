@@ -1,22 +1,14 @@
 from signal import signal, SIGTERM, SIGHUP, pause
 from rpi_lcd import LCD
 
-lcd = LCD()
-
 def safe_exit(signum, frame):
-    exit(1)
+    exit(0)
 
-try:
+def get_lcd():
+    lcd = LCD()
     signal(SIGTERM, safe_exit)
     signal(SIGHUP, safe_exit)
 
-    lcd.text("Hello,", 1)
-    lcd.text("Raspberry Pi!", 2)
+    lcd.text("CYBOT GALACTICA", 1)
+    lcd.text("C-3DK", 2)
 
-    pause()
-
-except KeyboardInterrupt:
-    pass
-
-finally:
-    lcd.clear()
