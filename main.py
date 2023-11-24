@@ -20,6 +20,8 @@ from langchain.agents.output_parsers import JSONAgentOutputParser
 
 from langchain.prompts import PromptTemplate
 from langchain.prompts.chat import SystemMessagePromptTemplate
+from elevenlabs import generate, play, stream
+
 
 from tools.search_tools import search_general
 from tools.geo_tools import get_ip, get_location
@@ -36,6 +38,7 @@ load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 serpapi_api_key = os.getenv("SERPAPI_API_KEY")
 eleven_api_key = os.getenv('ELEVEN_API_KEY')
+
 
 prompt = hub.pull("hwchase17/react-chat-json")
 
@@ -139,5 +142,13 @@ try:
         
         # Print the agent's response
         print("Bot:", response)
+        audio = generate(
+            text=response,
+            voice="Bella",
+            model="eleven_multilingual_v2",
+            stream=True
+        )
+
+        stream(audio)
 except KeyboardInterrupt:
     print("\nLive chat interrupted.")
