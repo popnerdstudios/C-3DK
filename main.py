@@ -23,14 +23,16 @@ from langchain.prompts.chat import SystemMessagePromptTemplate
 
 from langchain.utilities.dalle_image_generator import DallEAPIWrapper
 
-from langchain.tools import BaseTool, StructuredTool, Tool, tool
+from langchain.tools import Tool, tool
 from tools.search_tools import search_general
 from tools.geo_tools import get_ip, get_location
 from tools.search_tools import search_general
 from tools.time_tools import get_time
-from tools.lore_tools import get_lore
 from tools.lcd_tools import lcd_time
-from tools.link_tools import parse_image
+from tools.link_tools import get_links, get_website_content, parse_image
+from tools.file_tools import parse_file
+from tools.telegram_tools import parse_telegram_send
+from tools.contact_tools import get_contacts
 
 
 from elevenlabs import generate, play, stream, voices, Voice, VoiceSettings
@@ -63,7 +65,17 @@ tools = [
     Tool.from_function(
         name="Search general",
         func=search_general,
-        description="Useful for when you need to answer general questions"
+        description="Useful for when you need to answer general questions."
+    ),
+    Tool.from_function(
+        name="Get Link",
+        func=get_links,
+        description="Useful for when you need to get links. Useful if you will need to open a link to open. The input to this tool should be a google search query."
+    ),
+    Tool.from_function(
+        name="Open Link",
+        func=get_website_content,
+        description="Useful for when you need to get the content from a wesbite. Useful if more information is needed after a search. The input to this tool should be a valid URL."
     ),
     Tool.from_function(
         name="Current Location",
@@ -81,9 +93,19 @@ tools = [
         description="Useful for when you need to save an image from a URL. The input to this tool should be a comma separated list of a URL and filename. For example, `www.website.com/img, apple.jpg` would be the input if you wanted to download an image of an apple from website.com."
     ),
     Tool.from_function(
-    name="Lore general",
-    func=get_lore,
-    description="Useful for when you need to get information about yourself or your past."
+        name="Create File",
+        func=parse_file,
+        description="Useful for when you need to write text or code to a file. The input to this tool should be a list of the content, and the filename separated by '@@@'. For example, `print(test) @@@ print.py` would be the input if you wanted to write a print statement to a file called print.py."
+    ),
+    Tool.from_function(
+        name="Get Contact Info",
+        func=get_contacts,
+        description="Useful for when you need to get contact information of someone or when you need to know who your owner is. Do this before attempting to contact anyone."
+    ),
+    Tool.from_function(
+        name="Send Telegram Message",
+        func=parse_telegram_send,
+        description="Useful for when you need to send a Telegram message. The input to this tool should be a list of the message content, and the telegram chat id separated by '@@@'. For example, `Hi there, John @@@ 87463624` would be the input if you wanted to greet John."
     ),
 ]
 
