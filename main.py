@@ -1,44 +1,45 @@
 from dotenv import load_dotenv
+import threading
+import queue
 import os
-import re
+
+import soundfile as sf
+import numpy as np
+from io import BytesIO
 
 from langchain import hub
+from langchain.memory import ConversationBufferMemory
+from langchain.chat_models import ChatOpenAI
+
 from langchain.agents.format_scratchpad import format_log_to_str
 from langchain.agents.output_parsers import ReActSingleInputOutputParser
 from langchain.tools.render import render_text_description
-from langchain.tools import BaseTool, StructuredTool, Tool, tool
-from langchain.agents import AgentExecutor
-from langchain.agents import AgentType, Tool, initialize_agent
-
-from langchain.memory import ConversationBufferMemory
-
-from langchain.chat_models import ChatOpenAI
-
+from langchain.agents import AgentType, AgentExecutor, Tool, initialize_agent, load_tools
 from langchain.agents.format_scratchpad import format_log_to_messages
-from langchain.agents import AgentExecutor
 from langchain.agents.output_parsers import JSONAgentOutputParser
 
 from langchain.prompts import PromptTemplate
 from langchain.prompts.chat import SystemMessagePromptTemplate
-from elevenlabs import generate, play, stream
 
+from langchain.utilities.dalle_image_generator import DallEAPIWrapper
 
+from langchain.tools import BaseTool, StructuredTool, Tool, tool
 from tools.search_tools import search_general
 from tools.geo_tools import get_ip, get_location
 from tools.search_tools import search_general
 from tools.time_tools import get_time
 from tools.lore_tools import get_lore
-from tools.lcd_tools import get_lcd, safe_exit
+from tools.lcd_tools import lcd_time
+from tools.link_tools import parse_image
 
-import json
 
+from elevenlabs import generate, play, stream, voices, Voice, VoiceSettings
 
 load_dotenv()
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
 serpapi_api_key = os.getenv("SERPAPI_API_KEY")
 eleven_api_key = os.getenv('ELEVEN_API_KEY')
-
 
 prompt = hub.pull("hwchase17/react-chat-json")
 
@@ -75,11 +76,20 @@ tools = [
         description="Gets the current time if you know the timezone."
     ),
     Tool.from_function(
-        name="Lore general",
-        func=get_lore,
-        description="Useful for when you need to get information about yourself or your past."
+        name="Save Image",
+        func=parse_image,
+        description="Useful for when you need to save an image from a URL. The input to this tool should be a comma separated list of a URL and filename. For example, `www.website.com/img, apple.jpg` would be the input if you wanted to download an image of an apple from website.com."
+    ),
+    Tool.from_function(
+    name="Lore general",
+    func=get_lore,
+    description="Useful for when you need to get information about yourself or your past."
     ),
 ]
+
+new_tools = load_tools(["dalle-image-generator"])
+tools.extend(new_tools)
+
 
 prompt = prompt.partial(
     tools=render_text_description(tools),
@@ -125,30 +135,56 @@ agent = (
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, memory=memory)
 
-# Main live chat loop
-try:
-    while True:
-        # Get user input from the command prompt
-        user_input = input("You: ")
-        if user_input.lower() == 'exit':
-            print("Exiting live chat.")
-            break
+lcd_queue = queue.Queue(maxsize=1)
 
-        # Prepare the input for the agent
-        invocation_input = {"input": user_input}
-        
-        # Invoke the agent and get the response
-        response = agent_executor.invoke(invocation_input)["output"]
-        
-        # Print the agent's response
-        print("Bot:", response)
-        audio = generate(
-            text=response,
-            voice="Bella",
-            model="eleven_multilingual_v2",
-            stream=True
-        )
+def live_chat(lcd_queue):
+    try:
+        while True:
+            user_input = input("You: ")
+            if user_input.lower() == 'exit':
+                print("Exiting live chat.")
+                break
 
-        stream(audio)
-except KeyboardInterrupt:
-    print("\nLive chat interrupted.")
+            lcd_queue.put(1)
+
+            invocation_input = {"input": user_input}
+            response = agent_executor.invoke(invocation_input)["output"]
+            
+            print("Bot:", response)
+
+            lcd_queue.put(0)
+            '''
+            response_audio_bytes = generate(
+                text=response,
+                voice="Edgar - nerdy",
+                model="eleven_monolingual_v1",
+                stream=False 
+            )
+
+            response_audio_data, sample_rate = sf.read(BytesIO(response_audio_bytes))
+
+            delay_samples = int(10 * sample_rate / 1000)
+            echoed_audio_data = np.copy(response_audio_data)
+            echoed_audio_data[delay_samples:] += 0.9 * response_audio_data[:-delay_samples]
+
+            output_bytes_io = BytesIO()
+            sf.write(output_bytes_io, echoed_audio_data, sample_rate, format='wav')
+
+            output_audio_bytes = output_bytes_io.getvalue()
+            play(output_audio_bytes)
+            '''
+
+    except KeyboardInterrupt:
+        print("\nLive chat interrupted.")
+    finally:
+        lcd_queue.put(0)
+
+if __name__ == "__main__":
+    lcd_thread = threading.Thread(target=lcd_time, args=(lcd_queue,))
+    chat_thread = threading.Thread(target=live_chat, args=(lcd_queue,)) 
+
+    lcd_thread.start()
+    chat_thread.start()
+
+    lcd_thread.join()
+    chat_thread.join()
