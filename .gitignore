@@ -3,3 +3,4 @@
 lore.txt
 .cache
 /tools/.cache
+/tools/__pycache__/
