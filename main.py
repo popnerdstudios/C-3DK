@@ -4,6 +4,7 @@ import queue
 import os
 
 import soundfile as sf
+import speech_recognition as sr
 import numpy as np
 from io import BytesIO
 
@@ -26,13 +27,14 @@ from langchain.utilities.dalle_image_generator import DallEAPIWrapper
 from langchain.tools import Tool, tool
 from tools.search_tools import search_general
 from tools.geo_tools import get_ip, get_location
-from tools.search_tools import search_general
 from tools.time_tools import get_time
 from tools.lcd_tools import lcd_time
 from tools.link_tools import get_links, get_website_content, parse_image
 from tools.file_tools import parse_file
 from tools.telegram_tools import parse_telegram_send
 from tools.contact_tools import get_contacts
+from tools.spotify_tools import play_song, play_album, spotify_controller, get_user_playlists, play_spotify_uri
+
 
 
 from elevenlabs import generate, play, stream, voices, Voice, VoiceSettings
@@ -80,7 +82,7 @@ tools = [
     Tool.from_function(
         name="Current Location",
         func=get_location,
-        description="Useful for when you need the current location or timezone for real time data."
+        description="Useful for when you need the current location or timezone for real time data such as weather."
     ),
     Tool.from_function(
         name="Current Time",
@@ -106,6 +108,31 @@ tools = [
         name="Send Telegram Message",
         func=parse_telegram_send,
         description="Useful for when you need to send a Telegram message. The input to this tool should be a list of the message content, and the telegram chat id separated by '@@@'. For example, `Hi there, John @@@ 87463624` would be the input if you wanted to greet John."
+    ),
+    Tool.from_function(
+        name="Play Song on Spotify",
+        func=play_song,
+        description="Useful for when you need to play a song on Spotify. The input to this tool should be the search query to find this song. For example, `Lose Yourself by Eminem`."
+    ),
+    Tool.from_function(
+        name="Play Album on Spotify",
+        func=play_album,
+        description="Useful for when you need to play an album on Spotify. The input to this tool should be the search query to find this album. For example, `The Car by Arctic Monkeys`."
+    ),
+    Tool.from_function(
+        name="Spotify Controller",
+        func=spotify_controller,
+        description="Useful for when you need to control or start music playback on Spotify. The input to this tool must be one of the following based on the given request: 'start' | 'pause' | 'skip' | 'previous' | 'shuffle'"
+    ),
+    Tool.from_function(
+        name="Get User Playlists",
+        func=get_user_playlists,
+        description="Useful for when you need to get user playlist URIs."
+    ),
+    Tool.from_function(
+        name="Play URI on Spotify",
+        func=play_spotify_uri,
+        description="Useful for when you need to play a playlist, album, or song using its URI. The input to this tool must be a known URI, for example: 'spotify:playlist:6rqhFgbbKwnb9MLmUQDhG6'"
     ),
 ]
 
@@ -162,6 +189,7 @@ lcd_queue = queue.Queue(maxsize=1)
 def live_chat(lcd_queue):
     try:
         while True:
+
             user_input = input("You: ")
             if user_input.lower() == 'exit':
                 print("Exiting live chat.")
@@ -172,10 +200,10 @@ def live_chat(lcd_queue):
             invocation_input = {"input": user_input}
             response = agent_executor.invoke(invocation_input)["output"]
             
-            print("Bot:", response)
+            print("C-3DK:", response)
 
             lcd_queue.put(0)
-            '''
+            
             response_audio_bytes = generate(
                 text=response,
                 voice="Edgar - nerdy",
@@ -194,12 +222,14 @@ def live_chat(lcd_queue):
 
             output_audio_bytes = output_bytes_io.getvalue()
             play(output_audio_bytes)
-            '''
+            
 
     except KeyboardInterrupt:
         print("\nLive chat interrupted.")
     finally:
         lcd_queue.put(0)
+
+
 
 if __name__ == "__main__":
     lcd_thread = threading.Thread(target=lcd_time, args=(lcd_queue,))
