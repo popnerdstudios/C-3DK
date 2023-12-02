@@ -1,12 +1,16 @@
 from dotenv import load_dotenv
 import threading
 import queue
+import sys
 import os
 
+import time
 import soundfile as sf
 import speech_recognition as sr
 import numpy as np
 from io import BytesIO
+from termcolor import colored, cprint
+from playsound import playsound
 
 from langchain import hub
 from langchain.memory import ConversationBufferMemory
@@ -34,8 +38,6 @@ from tools.file_tools import parse_file
 from tools.telegram_tools import parse_telegram_send
 from tools.contact_tools import get_contacts
 from tools.spotify_tools import play_song, play_album, spotify_controller, get_user_playlists, play_spotify_uri
-
-
 
 from elevenlabs import generate, play, stream, voices, Voice, VoiceSettings
 
@@ -112,7 +114,7 @@ tools = [
     Tool.from_function(
         name="Play Song on Spotify",
         func=play_song,
-        description="Useful for when you need to play a song on Spotify. The input to this tool should be the search query to find this song. For example, `Lose Yourself by Eminem`."
+        description="Useful for when you need to play a song on Spotify. The input to this tool should be the search query to find this song. For example, `Lose Yourself`."
     ),
     Tool.from_function(
         name="Play Album on Spotify",
@@ -182,46 +184,122 @@ agent = (
 )
 
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, memory=memory)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, memory=memory, handle_parsing_errors=True)
 
 lcd_queue = queue.Queue(maxsize=1)
+input_queue = queue.Queue(maxsize=1)
+
+exit_flag = False
+just_responded = False
+processing_input = False
+
+def handle_text_input():
+    global exit_flag, processing_input
+    while not exit_flag:
+        if not processing_input:
+            user_input = input(colored("You: ", "blue"))
+            input_queue.put(("text", user_input))
+            if user_input.lower() == "exit":
+                exit_flag = True
+
+def handle_voice_input():
+    global exit_flag, just_responded, processing_input, lcd_queue
+
+    r = sr.Recognizer()
+    keyword = "3d"  
+
+    with sr.Microphone() as source:
+        r.adjust_for_ambient_noise(source, duration=1)
+
+        while not exit_flag:
+            if not processing_input:
+                try:
+                    if just_responded == True:
+                        lcd_queue.put(2)
+                        playsound("audio/beep.mp3")
+                        print(colored("Listening for full input...", "magenta"))
+                        audio = r.listen(source, timeout=10, phrase_time_limit=10)
+                        text = r.recognize_google(audio)
+                        print_text = "You: " + text
+                        lcd_queue.put(0)
+                        print(colored(print_text))
+                        input_queue.put(("voice", text))
+                    else:
+                        print(colored("Listening for keyword...", "magenta"))
+                        audio = r.listen(source)
+                        text = r.recognize_google(audio)
+
+                        if keyword.lower() in text.lower():
+                            lcd_queue.put(2)
+                            playsound("audio/beep.mp3")
+                            print(colored("KEYWORD detected, listening for full input...", "light_green"))
+                            audio = r.listen(source, timeout=10, phrase_time_limit=10)
+                            text = r.recognize_google(audio)
+                            print_text = "You: " + text
+                            lcd_queue.put(0)
+                            print(colored(print_text))
+                            input_queue.put(("voice", text))
+                except sr.WaitTimeoutError:
+                    lcd_queue.put(0)
+                    print("Listening timed out while waiting for phrase to start.")
+                    just_responded = False
+                except sr.UnknownValueError:
+                    lcd_queue.put(0)
+                    print("Could not understand audio")
+                except sr.RequestError as e:
+                    lcd_queue.put(0)
+                    print("Error from Google Speech Recognition service; {0}".format(e))
+
 
 def live_chat(lcd_queue):
+    global exit_flag, just_responded, processing_input
+
     try:
-        while True:
+        while not exit_flag:
+            if not input_queue.empty():
+                processing_input = True
+                input_type, user_input = input_queue.get() 
 
-            user_input = input("You: ")
-            if user_input.lower() == 'exit':
-                print("Exiting live chat.")
-                break
+                if user_input.lower() == 'exit':
+                    print("Powering down...")
+                    exit_flag = True
+                    break
 
-            lcd_queue.put(1)
+                lcd_queue.put(1)
 
-            invocation_input = {"input": user_input}
-            response = agent_executor.invoke(invocation_input)["output"]
+                invocation_input = {"input": user_input}
+                response = agent_executor.invoke(invocation_input)["output"]
+                
+                console_response = "C-3DK:" + response
+                print(colored(console_response, "yellow"))
+
+                lcd_queue.put(0)
             
-            print("C-3DK:", response)
+                response_audio_bytes = generate(
+                    text=response,
+                    voice="Edgar - nerdy",
+                    model="eleven_monolingual_v1",
+                    stream=False 
+                )
 
-            lcd_queue.put(0)
-            
-            response_audio_bytes = generate(
-                text=response,
-                voice="Edgar - nerdy",
-                model="eleven_monolingual_v1",
-                stream=False 
-            )
+                response_audio_data, sample_rate = sf.read(BytesIO(response_audio_bytes))
 
-            response_audio_data, sample_rate = sf.read(BytesIO(response_audio_bytes))
+                delay_samples = int(10 * sample_rate / 1000)
+                echoed_audio_data = np.copy(response_audio_data)
+                echoed_audio_data[delay_samples:] += 0.9 * response_audio_data[:-delay_samples]
 
-            delay_samples = int(10 * sample_rate / 1000)
-            echoed_audio_data = np.copy(response_audio_data)
-            echoed_audio_data[delay_samples:] += 0.9 * response_audio_data[:-delay_samples]
+                output_bytes_io = BytesIO()
+                sf.write(output_bytes_io, echoed_audio_data, sample_rate, format='wav')
 
-            output_bytes_io = BytesIO()
-            sf.write(output_bytes_io, echoed_audio_data, sample_rate, format='wav')
+                output_audio_bytes = output_bytes_io.getvalue()
+                play(output_audio_bytes)
 
-            output_audio_bytes = output_bytes_io.getvalue()
-            play(output_audio_bytes)
+                audio_duration = len(response_audio_data) / sample_rate
+                time.sleep(audio_duration)
+    
+                processing_input = False
+                if input_type == "voice":
+                    just_responded = True
             
 
     except KeyboardInterrupt:
@@ -230,13 +308,23 @@ def live_chat(lcd_queue):
         lcd_queue.put(0)
 
 
-
 if __name__ == "__main__":
-    lcd_thread = threading.Thread(target=lcd_time, args=(lcd_queue,))
-    chat_thread = threading.Thread(target=live_chat, args=(lcd_queue,)) 
+    lcd_queue = queue.Queue()
 
+    # Create threads
+    voice_thread = threading.Thread(target=handle_voice_input)
+    text_thread = threading.Thread(target=handle_text_input)
+    lcd_thread = threading.Thread(target=lcd_time, args=(lcd_queue,))
+    chat_thread = threading.Thread(target=live_chat, args=(lcd_queue,))
+
+    # Start threads
+    voice_thread.start()
+    text_thread.start()
     lcd_thread.start()
     chat_thread.start()
 
+    # Join threads
+    voice_thread.join()
+    text_thread.join()
     lcd_thread.join()
     chat_thread.join()
