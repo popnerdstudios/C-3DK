@@ -22,8 +22,9 @@ C-3DK is a GPT and Langchain powered chatbot that runs on a Raspberry Pi. It's d
 
 ## Additional Tools and Functionalities
 
-### ElevenLabs Voice Generation
+### ElevenLabs Voice Generation and STT
 - Integrates ElevenLabs' advanced text-to-speech technology.
+- Utilizes Google's Speech-to-Text for voice recognition and interaction.
 - Offers a realistic voice response, enhancing the interactive experience.
 
 ### Dall-E Image Generator
@@ -37,6 +38,12 @@ C-3DK is a GPT and Langchain powered chatbot that runs on a Raspberry Pi. It's d
 ### Geo and Time Tools
 - Utilizes geo tools to provide location-based responses.
 - Time tools to offer time-sensitive information.
+
+### Telegram Messaging Tools
+- Integrates with Telegram for versatile messaging capabilities.
+
+### Spotify Music Control Tools
+- Controls Spotify playback, providing a seamless music experience.
 
 ### Customizable Conversation Templates
 - Features customizable conversation templates, allowing for personalized and context-aware interactions.
