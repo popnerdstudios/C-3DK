@@ -215,13 +215,18 @@ def handle_voice_input():
             if not processing_input:
                 try:
                     if just_responded == True:
+                        just_responded = False
                         lcd_queue.put(2)
+                        
                         playsound("audio/beep.mp3")
+                        time.sleep(1)
+
                         print(colored("Listening for full input...", "magenta"))
                         audio = r.listen(source, timeout=10, phrase_time_limit=10)
                         text = r.recognize_google(audio)
                         print_text = "You: " + text
                         lcd_queue.put(0)
+
                         print(colored(print_text))
                         input_queue.put(("voice", text))
                     else:
@@ -232,11 +237,14 @@ def handle_voice_input():
                         if keyword.lower() in text.lower():
                             lcd_queue.put(2)
                             playsound("audio/beep.mp3")
+                            time.sleep(1)
+                            
                             print(colored("KEYWORD detected, listening for full input...", "light_green"))
                             audio = r.listen(source, timeout=10, phrase_time_limit=10)
                             text = r.recognize_google(audio)
                             print_text = "You: " + text
                             lcd_queue.put(0)
+                            
                             print(colored(print_text))
                             input_queue.put(("voice", text))
                 except sr.WaitTimeoutError:
