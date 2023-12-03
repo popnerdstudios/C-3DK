@@ -43,6 +43,8 @@ from elevenlabs import generate, play, stream, voices, Voice, VoiceSettings
 
 load_dotenv()
 
+DEV_MODE = True # Disables STT and TSS if True
+
 openai_api_key = os.getenv("OPENAI_API_KEY")
 serpapi_api_key = os.getenv("SERPAPI_API_KEY")
 eleven_api_key = os.getenv('ELEVEN_API_KEY')
@@ -244,7 +246,7 @@ def handle_voice_input():
                             text = r.recognize_google(audio)
                             print_text = "You: " + text
                             lcd_queue.put(0)
-                            
+
                             print(colored(print_text))
                             input_queue.put(("voice", text))
                 except sr.WaitTimeoutError:
@@ -260,7 +262,7 @@ def handle_voice_input():
 
 
 def live_chat(lcd_queue):
-    global exit_flag, just_responded, processing_input
+    global exit_flag, just_responded, processing_input, DEV_MODE
 
     try:
         while not exit_flag:
@@ -283,32 +285,33 @@ def live_chat(lcd_queue):
 
                 lcd_queue.put(0)
             
-                response_audio_bytes = generate(
-                    text=response,
-                    voice="Edgar - nerdy",
-                    model="eleven_monolingual_v1",
-                    stream=False 
-                )
+                if not DEV_MODE:
+                    response_audio_bytes = generate(
+                        text=response,
+                        voice="Edgar - nerdy",
+                        model="eleven_monolingual_v1",
+                        stream=False 
+                    )
 
-                response_audio_data, sample_rate = sf.read(BytesIO(response_audio_bytes))
+                    response_audio_data, sample_rate = sf.read(BytesIO(response_audio_bytes))
 
-                delay_samples = int(10 * sample_rate / 1000)
-                echoed_audio_data = np.copy(response_audio_data)
-                echoed_audio_data[delay_samples:] += 0.9 * response_audio_data[:-delay_samples]
+                    delay_samples = int(10 * sample_rate / 1000)
+                    echoed_audio_data = np.copy(response_audio_data)
+                    echoed_audio_data[delay_samples:] += 0.9 * response_audio_data[:-delay_samples]
 
-                output_bytes_io = BytesIO()
-                sf.write(output_bytes_io, echoed_audio_data, sample_rate, format='wav')
+                    output_bytes_io = BytesIO()
+                    sf.write(output_bytes_io, echoed_audio_data, sample_rate, format='wav')
 
-                output_audio_bytes = output_bytes_io.getvalue()
-                play(output_audio_bytes)
+                    output_audio_bytes = output_bytes_io.getvalue()
+                    play(output_audio_bytes)
 
-                audio_duration = len(response_audio_data) / sample_rate
-                time.sleep(audio_duration)
-    
+                    audio_duration = len(response_audio_data) / sample_rate
+                    time.sleep(audio_duration)
+        
+                    if input_type == "voice":
+                        just_responded = True
+                
                 processing_input = False
-                if input_type == "voice":
-                    just_responded = True
-            
 
     except KeyboardInterrupt:
         print("\nLive chat interrupted.")
@@ -319,20 +322,25 @@ def live_chat(lcd_queue):
 if __name__ == "__main__":
     lcd_queue = queue.Queue()
 
+    if DEV_MODE:
+        print(colored("Starting in DEV MODE; TTS and STT are disabled.", "red"))
     # Create threads
-    voice_thread = threading.Thread(target=handle_voice_input)
+    if not DEV_MODE:
+        voice_thread = threading.Thread(target=handle_voice_input)
     text_thread = threading.Thread(target=handle_text_input)
     lcd_thread = threading.Thread(target=lcd_time, args=(lcd_queue,))
     chat_thread = threading.Thread(target=live_chat, args=(lcd_queue,))
 
     # Start threads
-    voice_thread.start()
+    if not DEV_MODE:
+        voice_thread.start()
     text_thread.start()
     lcd_thread.start()
     chat_thread.start()
 
     # Join threads
-    voice_thread.join()
+    if not DEV_MODE:
+        voice_thread.join()
     text_thread.join()
     lcd_thread.join()
     chat_thread.join()
