@@ -65,7 +65,7 @@ else:
     prompt.messages[0] = new_system_message_prompt
 
 
-chat_model = ChatOpenAI(temperature=0, model="gpt-4")
+chat_model = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
 
 tools = [
     Tool.from_function(
@@ -199,6 +199,7 @@ def handle_text_input():
     global exit_flag, processing_input
     while not exit_flag:
         if not processing_input:
+            processing_input = True
             user_input = input(colored("You: ", "blue"))
             input_queue.put(("text", user_input))
             if user_input.lower() == "exit":
@@ -229,7 +230,7 @@ def handle_voice_input():
                         print_text = "You: " + text
                         lcd_queue.put(0)
 
-                        print(colored(print_text))
+                        print(colored(print_text, "blue"))
                         input_queue.put(("voice", text))
                     else:
                         print(colored("Listening for keyword...", "magenta"))
@@ -277,11 +278,15 @@ def live_chat(lcd_queue):
 
                 lcd_queue.put(1)
 
+                start = time.time()
                 invocation_input = {"input": user_input}
                 response = agent_executor.invoke(invocation_input)["output"]
-                
+                end = time.time()
                 console_response = "C-3DK:" + response
                 print(colored(console_response, "yellow"))
+
+                if DEV_MODE:
+                    print("Response Time: ", end-start)
 
                 lcd_queue.put(0)
             

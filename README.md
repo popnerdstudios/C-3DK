@@ -6,7 +6,7 @@ C-3DK is a GPT and Langchain powered chatbot that runs on a Raspberry Pi. It's d
 ## Features
 
 ### GPT Integration
-- Utilizes GPT, specifically the GPT-4 model, for sophisticated language understanding and generation.
+- Utilizes GPT, specifically the GPT-4 & GPT-3.5-TURBO models, for sophisticated language understanding and generation.
 - Provides human-like responses, making interactions more engaging and realistic.
 
 ### Langchain for Enhanced Conversational Abilities
