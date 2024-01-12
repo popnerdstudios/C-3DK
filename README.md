@@ -16,10 +16,6 @@ C-3DK is a GPT and Langchain powered chatbot that runs on a Raspberry Pi. It's d
 ### Raspberry Pi Compatibility
 - Tailored to run efficiently on Raspberry Pi, ensuring accessibility and ease of deployment.
 
-### Star Wars Universe-Themed Conversational Skills
-- Programmed to interact in the style and knowledge base of a Star Wars protocol droid.
-- Offers users an immersive experience by leveraging lore and themes from the Star Wars universe.
-
 ## Additional Tools and Functionalities
 
 ### ElevenLabs Voice Generation and STT
