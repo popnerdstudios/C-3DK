@@ -60,5 +60,5 @@ C-3DK is a GPT and Langchain powered chatbot that runs on a Raspberry Pi. It's d
 This project is a fan-made creation and is not affiliated with the official Star Wars franchise or its creators.
 
 ## Contributions
-Contributions to C-3DK are welcome. Whether it's expanding the chatbot's knowledge of the Star Wars universe, enhancing its conversational skills, or improving its technical aspects, all contributions help make C-3DK more interactive and fun.
+Contributions to C-3DK are welcome. Whether it's expanding the chatbot's knowledge, enhancing its conversational skills, or improving its technical aspects, all contributions help make C-3DK more interactive and fun.
 
