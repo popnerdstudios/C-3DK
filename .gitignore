@@ -4,3 +4,4 @@ lore.txt
 .cache
 /tools/.cache
 /tools/__pycache__/
+system_message.txt
