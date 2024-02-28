@@ -65,7 +65,7 @@ else:
     prompt.messages[0] = new_system_message_prompt
 
 
-chat_model = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+chat_model = ChatOpenAI(temperature=0, model="gpt-4")
 
 tools = [
     Tool.from_function(
